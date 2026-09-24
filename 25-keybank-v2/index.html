@@ -32,13 +32,14 @@
   --shadow:0 10px 30px rgba(0,0,0,.45);
 }
 *{box-sizing:border-box}
-html,body{height:100%;overflow-x:hidden;max-width:100%}
+html{overflow-x:hidden;max-width:100%}
+body{min-height:100%;max-width:100%;overflow-x:clip}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
 button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;padding:0;touch-action:manipulation}
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 input[type=text],input[type=email],select{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:11px 12px;width:100%}
 label.f{display:grid;gap:5px;font-size:13px;font-weight:600;color:var(--ink2)}
-.app{max-width:960px;margin:0 auto;padding:0 16px;min-height:100%;display:flex;flex-direction:column;overflow-x:clip}
+.app{max-width:960px;margin:0 auto;padding:0 16px;min-height:100vh;display:flex;flex-direction:column;overflow-x:clip}
 h1,h2,h3{font-family:var(--disp);font-weight:700;line-height:1;margin:0;text-wrap:balance}
 .eyebrow{font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2)}
 .muted{color:var(--ink2)}
@@ -395,17 +396,19 @@ const sceneColor = id => { const i=scenes.findIndex(s=>s.id===id); return PALETT
 const scStyle = id => `style="--sc:${sceneColor(id)}"`;
 
 // ---------- navigation ----------
-let screen='signin', history=[];
+let screen='signin', history=[], scrollPos={}, restoreScroll=false;
 function show(name, push=true){
+  scrollPos[screen]=window.scrollY;
   if(push && screen!==name) history.push(screen);
+  const fromSingle = restoreScroll; restoreScroll=false;
   screen=name;
-  if(name==='review') view='collection';
+  if(name==='review' && !fromSingle) view='collection';
   document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id==='s-'+name));
   $('#backBtn').hidden = (name==='start'||name==='signin');
   render();
-  window.scrollTo(0,0);
+  window.scrollTo(0, fromSingle ? (scrollPos[name]||0) : 0);
 }
-$('#backBtn').onclick = () => { let prev = history.pop() || 'start'; if(viewing){ stopViewing(); prev = user ? 'start' : 'signin'; history=[]; } else if(prev==='signin') prev='start'; show(prev,false); };
+$('#backBtn').onclick = () => { let prev = history.pop() || 'start'; if(viewing){ stopViewing(); prev = user ? 'start' : 'signin'; history=[]; } else if(prev==='signin') prev='start'; if(screen==='swipe' && deckSingle){ deckSingle=false; restoreScroll=true; } show(prev,false); };
 
 function render(){
   $('#barTitle').textContent = CONFIG.jobName;
@@ -641,7 +644,7 @@ function decide(id, pick){
 }
 function skip(){ flyOut('down', ()=>advance('skip')); }
 function advance(pick){
-  if(deckSingle){ history.pop(); show(singleReturn,false); return; }
+  if(deckSingle){ history.pop(); restoreScroll=true; show(singleReturn,false); return; }
   if(pick==='skip'){ deck.push(deck.splice(idx,1)[0]); } else { idx++; }
   const n=selected().length;
   if(pick!=='skip' && pick!=='__no' && n>=totalNeeded && !quotaShown && idx<deck.length){
