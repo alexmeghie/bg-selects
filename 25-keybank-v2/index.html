@@ -103,8 +103,8 @@ h1,h2,h3{font-family:var(--disp);font-weight:700;line-height:1;margin:0;text-wra
 .scenes-row::-webkit-scrollbar{display:none}
 .scenebtn{flex:none;border:2px solid var(--line);border-radius:999px;padding:8px 14px;font-family:var(--disp);font-weight:600;font-size:17px;letter-spacing:.02em;background:var(--card);line-height:1;display:inline-flex;align-items:center;gap:8px}
 .scenebtn small{font-family:var(--body);font-weight:600;font-size:12px;color:var(--ink2);letter-spacing:0}
-.scenebtn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.scenebtn.on small{color:inherit;opacity:.85}
+.scenebtn.on{background:var(--sc);border-color:var(--sc);color:#0B1A00}
+.scenebtn.on small{color:inherit;opacity:.75}
 .tools{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .tools .muted{font-size:14px}
 .tbtn{border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:14px;font-weight:500;background:var(--card);display:inline-flex;align-items:center;gap:6px}
@@ -126,16 +126,16 @@ h1,h2,h3{font-family:var(--disp);font-weight:700;line-height:1;margin:0;text-wra
 .tile .m{font-size:11px;color:var(--ink2);line-height:1.2}
 .numtag{font-family:var(--disp);font-weight:700;font-size:.95em;color:var(--ink2);letter-spacing:.02em;white-space:nowrap}
 .numtag::before{content:'#'}
-.tile.sel{border-color:var(--accent)}
-.tile.sel.other{border-color:var(--ink2)}
+.tile.sel{border-color:var(--sc)}
+.tile.sel.other{opacity:.85}
 .tile .ph{position:relative}
-.tile .mark{position:absolute;top:5px;left:5px;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:none;align-items:center;justify-content:center;font-weight:700;font-size:15px;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.tile .mark{position:absolute;top:5px;left:5px;width:26px;height:26px;border-radius:50%;background:var(--sc);color:#0B1A00;display:none;align-items:center;justify-content:center;font-weight:700;font-size:15px;box-shadow:0 1px 4px rgba(0,0,0,.3)}
 .tile.sel .mark{display:flex}
-.tile.sel.other .mark{background:var(--ink2)}
-.tile .scn{position:absolute;bottom:0;left:0;right:0;font-family:var(--disp);font-weight:600;font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:3px 6px;background:rgba(22,25,29,.78);color:#fff;border-radius:0 0 6px 6px;display:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.tile .scn{position:absolute;bottom:0;left:0;right:0;font-family:var(--disp);font-weight:600;font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:3px 6px;background:var(--sc);color:#0B1A00;border-radius:0 0 6px 6px;display:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tile.sel .scn{display:block}
 .tile .x{position:absolute;top:5px;right:5px;width:28px;height:28px;border-radius:50%;background:rgba(22,25,29,.55);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1}
-.tile.rejected img{filter:grayscale(1);opacity:.45}
+.tile.rejected img{filter:grayscale(1) brightness(.55);opacity:.35}
 .tile.rejected .x{background:var(--reject)}
 .tile.rejected .n{color:var(--ink2);text-decoration:line-through}
 .tile .view{position:absolute;bottom:4px;right:4px;background:rgba(22,25,29,.6);color:#fff;font-size:11px;padding:2px 7px;border-radius:4px}
@@ -155,14 +155,14 @@ h1,h2,h3{font-family:var(--disp);font-weight:700;line-height:1;margin:0;text-wra
 .card .badge{position:absolute;top:12px;right:12px;font-family:var(--disp);font-weight:700;font-size:20px;line-height:1;padding:6px 9px;border-radius:6px;background:var(--ink);color:var(--bg);opacity:.9}
 .card .badge::before{content:'#';opacity:.6;font-size:.8em}
 .card .stamp{position:absolute;top:18px;left:18px;font-family:var(--disp);font-weight:700;font-size:28px;letter-spacing:.08em;text-transform:uppercase;padding:6px 12px;border:4px solid;border-radius:8px;transform:rotate(-12deg);opacity:0;transition:opacity .1s}
-.card .stamp.yes{color:var(--accent);border-color:var(--accent);background:rgba(255,255,255,.85)}
+.card .stamp.yes{color:#0B1A00;border-color:var(--sc,var(--accent));background:var(--sc,var(--accent))}
 .card .stamp.no{color:var(--reject);border-color:var(--reject);background:rgba(255,255,255,.85);left:auto;right:18px;transform:rotate(12deg)}
 .card.anim{transition:transform .28s ease,opacity .28s ease}
 .actions{display:grid;gap:10px;width:min(100%,420px);margin:0 auto}
 .btn{border-radius:10px;padding:14px 10px;font-family:var(--disp);font-weight:600;font-size:19px;letter-spacing:.03em;text-align:center;border:2px solid var(--accent);color:var(--accent);background:var(--card);line-height:1}
 .btn small{display:block;font-family:var(--body);font-weight:500;font-size:12px;letter-spacing:0;margin-top:4px;color:var(--ink2)}
-.btn.fill{background:var(--accent);color:var(--accent-ink);font-size:22px;padding:16px 10px}
-.btn.fill small{color:inherit;opacity:.85}
+.btn.fill{background:var(--sc,var(--accent));border-color:var(--sc,var(--accent));color:#0B1A00;font-size:22px;padding:16px 10px}
+.btn.fill small{color:inherit;opacity:.75}
 .btn.no{border-color:var(--reject);color:var(--reject)}
 .btn.ghost{border-color:var(--line);color:var(--ink2);font-family:var(--body);font-size:14px;font-weight:500;padding:10px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -261,7 +261,7 @@ pre.out{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.5 ui-monospace,S
     </div>
     <div class="menu">
       <button class="primary" id="goGrid"><span class="l"><b>Quick select</b><span>Tap faces to select them for a scene.</span></span><span class="arrow">›</span></button>
-      <button id="goCards"><span class="l"><b>One at a time</b><span id="cardsSub">Big photos. Swipe or tap Select / Pass.</span></span><span class="arrow">›</span></button>
+      <button id="goCards"><span class="l"><b>Single select</b><span id="cardsSub">One big photo at a time. Swipe or tap Select / Pass.</span></span><span class="arrow">›</span></button>
       <button id="goReview"><span class="l"><b>Review &amp; send</b><span id="reviewSub"></span></span><span class="arrow">›</span></button>
     </div>
     <div id="othersWrap" hidden><div class="eyebrow" style="margin-bottom:8px">Other people's selects (view only)</div><div class="known" id="others"></div></div>
@@ -390,12 +390,16 @@ const countFor = sid => selected().filter(t=>S().picks[t.id].s===sid).length;
 const meta = t => [t.age && ('Age '+t.age), t.size, t.gender].filter(Boolean).join(' · ');
 const byName=(a,b)=>a.name.localeCompare(b.name);
 let activeScene = scenes[0] ? scenes[0].id : null;   // the scene taps and swipes select for
+const PALETTE = ['#7CFC00','#FF8A00','#3EC7FF','#FF5FA8','#FFD400','#B388FF'];   // lawn green, orange, sky, pink, yellow, violet
+const sceneColor = id => { const i=scenes.findIndex(s=>s.id===id); return PALETTE[(i<0?0:i) % PALETTE.length]; };
+const scStyle = id => `style="--sc:${sceneColor(id)}"`;
 
 // ---------- navigation ----------
 let screen='signin', history=[];
 function show(name, push=true){
   if(push && screen!==name) history.push(screen);
   screen=name;
+  if(name==='review') view='collection';
   document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id==='s-'+name));
   $('#backBtn').hidden = (name==='start'||name==='signin');
   render();
@@ -419,7 +423,7 @@ function slate(suffix, compact){
     : [['Client',CONFIG.client],['Prod co',CONFIG.prodCo],['Director',CONFIG.director],['Shoot days',CONFIG.shootDates],['Location',CONFIG.location],['Total BG',`${totalNeeded} needed · ${TALENT.length} available`]].filter(x=>x[1]);
   $('#jobMeta'+suffix).innerHTML = rows.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
   const nt=$('#notes'+suffix); nt.hidden=!CONFIG.notes; nt.textContent=CONFIG.notes||'';
-  $('#sceneChips'+suffix).innerHTML = scenes.map(s=>`<span class="chip"><b class="num">${user?countFor(s.id)+'/':''}${s.count}</b> ${esc(s.name)}${!user?' needed':''}</span>`).join('');
+  $('#sceneChips'+suffix).innerHTML = scenes.map(s=>`<span class="chip" style="border-left:5px solid ${sceneColor(s.id)}"><b class="num">${user?countFor(s.id)+'/':''}${s.count}</b> ${esc(s.name)}${!user?' needed':''}</span>`).join('');
 }
 
 // ---------- sign in ----------
@@ -493,7 +497,7 @@ $('#resumeClear').onclick = () => confirmBox('Start over?', 'This clears every s
 // ---------- scene bar ----------
 function sceneBar(sel){
   $(sel).innerHTML = (scenes.length>1 ? `<span class="scenebar-lab" style="align-self:center;flex:none;font-family:var(--disp);font-weight:600;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2)">For</span>` : '') +
-    scenes.map(s=>`<button class="scenebtn ${s.id===activeScene?'on':''}" data-s="${s.id}">${esc(s.name)}<small class="num">${countFor(s.id)}/${s.count}</small></button>`).join('');
+    scenes.map(s=>`<button class="scenebtn ${s.id===activeScene?'on':''}" data-s="${s.id}" ${scStyle(s.id)}>${esc(s.name)}<small class="num">${countFor(s.id)}/${s.count}</small></button>`).join('');
   $(sel).querySelectorAll('.scenebtn').forEach(b=>b.onclick=()=>{ activeScene=b.dataset.s; render(); });
 }
 
@@ -531,7 +535,7 @@ $('#filterClear').onclick=()=>{ filt={name:'',ages:new Set(),genders:new Set(),s
 function tile(t, opts={}){
   const p=S().picks[t.id]||{};
   const sel=!!p.s, other=sel && p.s!==activeScene && !opts.review, rej=!!p.no;
-  return `<div class="tile ${sel?'sel':''} ${other?'other':''} ${rej?'rejected':''}" data-id="${t.id}" role="button" tabindex="0">
+  return `<div class="tile ${sel?'sel':''} ${other?'other':''} ${rej?'rejected':''}" data-id="${t.id}" role="button" tabindex="0" ${sel?scStyle(p.s):''}>
     <div class="ph"><img src="${t.img}" alt="" loading="lazy"><span class="mark">✓</span>${sel?`<span class="scn">${esc(sceneName(p.s))}</span>`:''}${opts.review?'':`<button class="x" data-x="${t.id}" aria-label="Pass">✕</button><button class="view" data-view="${t.id}">View</button>`}</div>
     <span class="n"><span class="numtag">${t.num}</span> ${esc(t.name)}</span>
     <span class="m">${esc(meta(t))}</span>
@@ -610,10 +614,10 @@ function renderSwipe(){
   $('#deckLabel').textContent = deckSingle ? '' : 'Not yet decided';
   $('#deckPos').textContent = deckSingle ? '' : `${idx+1} of ${deck.length}`;
   $('#deckBar').style.width = deckSingle ? '100%' : (idx/deck.length*100)+'%';
-  $('#stage').innerHTML = `<div class="card" id="card"><div class="stamp yes" id="stYes">Select</div><div class="stamp no" id="stNo">Pass</div><div class="badge">${t.num}</div><img src="${t.img}" alt="${esc(t.name)}"><div class="cap"><div class="n">${esc(t.name)}</div><div class="m">${esc(meta(t))}</div>${p.s?`<div class="m" style="color:var(--accent)">Selected: ${esc(sceneName(p.s))}</div>`:p.no?`<div class="m" style="color:var(--reject)">Passed</div>`:''}</div></div>`;
+  $('#stage').innerHTML = `<div class="card" id="card" ${scStyle(activeScene)}><div class="stamp yes" id="stYes">Select</div><div class="stamp no" id="stNo">Pass</div><div class="badge">${t.num}</div><img src="${t.img}" alt="${esc(t.name)}"><div class="cap"><div class="n">${esc(t.name)}</div><div class="m">${esc(meta(t))}</div>${p.s?`<div class="m" style="color:var(--accent)">Selected: ${esc(sceneName(p.s))}</div>`:p.no?`<div class="m" style="color:var(--reject)">Passed</div>`:''}</div></div>`;
   const sc=sceneObj(activeScene);
   const selLabel = scenes.length>1 ? `✓ Select<small>${esc(sc.name)} · ${countFor(sc.id)}/${sc.count}</small>` : `✓ Select<small class="num">${countFor(sc.id)}/${sc.count}</small>`;
-  $('#actions').innerHTML = `<button class="btn fill" data-pick="sel">${selLabel}</button><div class="row2"><button class="btn no" data-pick="__no">✕ Pass</button><button class="btn ghost" id="skipBtn">Skip for now</button></div><div class="linkrow"><button class="link" id="undoBtn" ${lastAction?'':'disabled style="opacity:.4"'}>Undo</button><button class="link" id="toReview">Review</button>${deckSingle?'':'<button class="link" id="toGrid">Quick select</button>'}</div><p class="hint">${deckSingle?'':'Swipe right to select, left to pass.'}</p>`;
+  $('#actions').innerHTML = `<button class="btn fill" data-pick="sel" ${scStyle(activeScene)}>${selLabel}</button><div class="row2"><button class="btn no" data-pick="__no">✕ Pass</button><button class="btn ghost" id="skipBtn">Skip for now</button></div><div class="linkrow"><button class="link" id="undoBtn" ${lastAction?'':'disabled style="opacity:.4"'}>Undo</button><button class="link" id="toReview">Review</button>${deckSingle?'':'<button class="link" id="toGrid">Quick select</button>'}</div><p class="hint">${deckSingle?'':'Swipe right to select, left to pass.'}</p>`;
   $('#actions').querySelector('[data-pick="sel"]').onclick=()=>decide(t.id, activeScene);
   $('#actions').querySelector('[data-pick="__no"]').onclick=()=>decide(t.id, '__no');
   $('#skipBtn').onclick=()=>skip();
@@ -705,7 +709,7 @@ function renderReview(){
     const body = view==='collection'
       ? `<div class="grid">${list.map(t=>tile(t,{review:true})).join('')}</div>`
       : `<div class="list">${list.map(t=>item(t, viewing?'':`<select aria-label="Scene" data-move="${t.id}">${opts(s.id)}</select><button class="xb no" data-rej="${t.id}">Pass</button>`)).join('')}</div>`;
-    html+=`<div class="section"><h2>${esc(s.name)} <span class="c num">${list.length} of ${s.count}</span></h2>${list.length?body:`<p class="muted">No one yet.${viewing?'':` <button class="link" data-cast="${s.id}">Select for ${esc(s.name)}</button>`}</p>`}</div>`;
+    html+=`<div class="section"><h2><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${sceneColor(s.id)};margin-right:8px;vertical-align:baseline"></span>${esc(s.name)} <span class="c num">${list.length} of ${s.count}</span></h2>${list.length?body:`<p class="muted">No one yet.${viewing?'':` <button class="link" data-cast="${s.id}">Select for ${esc(s.name)}</button>`}</p>`}</div>`;
   }
   const rej=rejected().sort(byName);
   html+=`<div class="section"><h2>Passed <span class="c num">${rej.length}</span></h2>${rej.length ? (view==='collection' ? `<div class="grid">${rej.map(t=>tile(t,{review:true})).join('')}</div>` : `<div class="list">${rej.map(t=>item(t, viewing?'':`<button class="xb yes" data-restore="${t.id}">Reconsider</button>`, true)).join('')}</div>`) : '<p class="muted">Nobody passed on.</p>'}</div>`;
