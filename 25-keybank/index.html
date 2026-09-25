@@ -518,11 +518,14 @@ function renderPeople(wrapSel, listSel, exclude){
     $(listSel).innerHTML=ppl.map((u,i)=>`<button type="button" data-i="${i}">${esc(u.name)}${u.role?' ('+esc(u.role)+')':''} · ${u.selected}${u.finalized?' ✓':''}</button>`).join('');
     $(listSel).querySelectorAll('button').forEach(b=>b.onclick=()=>viewOther(ppl[+b.dataset.i]));
   };
-  const local = knownUsers().map(u=>{ const st=loadFor(u)||{picks:{}}; return Object.assign({}, u, {picks:st.picks, selected:Object.values(st.picks).filter(p=>p.s).length, finalized:!!st.finalized}); });
-  draw(peopleCache||local);
-  if(SHEET && Date.now()-peopleAt>15000){
+  const local = () => knownUsers().map(u=>{ const st=loadFor(u)||{picks:{}}; return Object.assign({}, u, {picks:st.picks, selected:Object.values(st.picks).filter(p=>p.s).length, finalized:!!st.finalized}); });
+  // The job sheet is the only source of truth for who has selects: never show this device's own copies first,
+  // or rows deleted from the sheet would flash up. The device list is only a fallback when there's no sheet or it can't be reached.
+  if(!SHEET){ draw(local()); return; }
+  if(peopleCache) draw(peopleCache); else $(wrapSel).hidden=true;
+  if(Date.now()-peopleAt>15000){
     peopleAt=Date.now();
-    fetch(SHEET+'?action=list&job='+encodeURIComponent(CONFIG.jobKey)).then(r=>r.json()).then(j=>{ if(j&&j.people){ peopleCache=j.people; online=true; draw(peopleCache); setStatus(); } }).catch(()=>{ online=false; setStatus(); });
+    fetch(SHEET+'?action=list&job='+encodeURIComponent(CONFIG.jobKey)).then(r=>r.json()).then(j=>{ if(j&&j.people){ peopleCache=j.people; online=true; draw(peopleCache); setStatus(); } }).catch(()=>{ online=false; setStatus(); if(!peopleCache) draw(local()); });
   }
 }
 function stopViewing(){ viewing=null; viewState=null; }
