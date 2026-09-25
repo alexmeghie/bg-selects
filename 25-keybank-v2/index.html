@@ -407,19 +407,37 @@ const sceneColor = id => { const i=scenes.findIndex(s=>s.id===id); return PALETT
 const scStyle = id => `style="--sc:${sceneColor(id)}"`;
 
 // ---------- navigation ----------
-let screen='signin', history=[], scrollPos={}, restoreScroll=false;
-function show(name, push=true){
+let screen='signin', scrollPos={}, restoreScroll=false;
+const H = window.history;
+try{ H.scrollRestoration='manual'; }catch(e){}
+function paint(name){
   scrollPos[screen]=window.scrollY;
-  if(push && screen!==name) history.push(screen);
-  const fromSingle = restoreScroll; restoreScroll=false;
+  const back = restoreScroll; restoreScroll=false;
   screen=name;
-  if(name==='review' && !fromSingle) view='collection';
+  if(name==='review' && !back) view='collection';
   document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id==='s-'+name));
   $('#backBtn').hidden = (name==='start'||name==='signin');
   render();
-  window.scrollTo(0, fromSingle ? (scrollPos[name]||0) : 0);
+  window.scrollTo(0, back ? (scrollPos[name]||0) : 0);
 }
-$('#backBtn').onclick = () => { let prev = history.pop() || 'start'; if(viewing){ stopViewing(); prev = user ? 'start' : 'signin'; history=[]; } else if(prev==='signin') prev='start'; if(screen==='swipe' && deckSingle){ deckSingle=false; restoreScroll=true; } show(prev,false); };
+// go forward to a screen: adds a browser-history entry
+function show(name){
+  if(name===screen){ render(); return; }
+  try{ H.pushState({s:name}, ''); }catch(e){}
+  paint(name);
+}
+// browser / phone back (and the page's own Back button) land here
+window.addEventListener('popstate', e=>{
+  const to = (e.state && e.state.s) || 'signin';
+  closeModal();
+  if(screen==='swipe' && deckSingle) deckSingle=false;
+  if(viewing && to!=='review') stopViewing();
+  restoreScroll=true;
+  if(!user && to!=='signin'){ paint('signin'); return; }
+  paint(to);
+});
+try{ H.replaceState({s:'signin'}, ''); }catch(e){}
+$('#backBtn').onclick = () => H.back();
 
 function render(){
   $('#barTitle').textContent = CONFIG.jobName;
@@ -490,7 +508,7 @@ $('#signinForm').onsubmit = e => {
   }).catch(()=>{ online=false; signIn(u); toast('Could not reach the job sheet. Saving on this device for now.'); })
   .finally(()=>{ btn.disabled=false; btn.textContent='Start'; });
 };
-function signIn(u){ user=u; viewing=null; viewState=null; rememberUser(u); load(); history=[]; show('start',false); }
+function signIn(u){ user=u; viewing=null; viewState=null; rememberUser(u); load(); show('start'); }
 function viewOther(u){ viewing=u; viewState=u.picks?{picks:u.picks,finalized:!!u.finalized,sentAt:u.sent||null}:(loadFor(u)||{picks:{},finalized:false,sentAt:null}); show('review'); }
 let peopleCache=null, peopleAt=0;
 function renderPeople(wrapSel, listSel, exclude){
@@ -508,7 +526,7 @@ function renderPeople(wrapSel, listSel, exclude){
   }
 }
 function stopViewing(){ viewing=null; viewState=null; }
-$('#switchUser').onclick = () => { user=null; history=[]; show('signin',false); };
+$('#switchUser').onclick = () => { user=null; show('signin'); };
 
 // ---------- start ----------
 function renderStart(){
@@ -671,7 +689,7 @@ function decide(id, pick){
 }
 function skip(){ flyOut('down', ()=>advance('skip')); }
 function advance(pick){
-  if(deckSingle){ history.pop(); restoreScroll=true; show(singleReturn,false); return; }
+  if(deckSingle){ H.back(); return; }
   if(pick==='skip'){ deck.push(deck.splice(idx,1)[0]); } else { idx++; }
   const n=selected().length;
   if(pick!=='skip' && pick!=='__no' && n>=totalNeeded && !quotaShown && idx<deck.length){
