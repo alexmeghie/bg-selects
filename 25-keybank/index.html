@@ -192,6 +192,11 @@ h1,h2,h3{font-family:var(--disp);font-weight:700;line-height:1;margin:0;text-wra
 .item .xb.no{color:var(--reject);border-color:var(--reject)}
 .item .xb.yes{color:var(--accent);border-color:var(--accent)}
 .item.rejected img{filter:grayscale(1);opacity:.55}
+/* new options added after the first round (agency replacements etc.) */
+.newpill{display:inline-block;font-family:var(--disp);font-weight:700;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:1px 5px;border-radius:3px;background:var(--tbd);color:var(--tbd-ink);vertical-align:2px;margin-right:4px}
+.tile.isnew{border-color:var(--tbd)}
+.menu button.newopts{border:2px solid var(--tbd)}
+.menu button.newopts .l b::before{content:'NEW';font-size:12px;letter-spacing:.08em;padding:2px 6px;border-radius:4px;background:var(--tbd);color:var(--tbd-ink);margin-right:8px;vertical-align:3px}
 /* unavailable talent (agency said N/A): photo crossed out with a red X, can't be selected */
 .nax{position:absolute;inset:0;pointer-events:none;border-radius:inherit;z-index:2;
   background:linear-gradient(to top right,transparent calc(50% - 3px),#E0322B calc(50% - 3px),#E0322B calc(50% + 3px),transparent calc(50% + 3px)),
@@ -277,6 +282,7 @@ pre.out{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.5 ui-monospace,S
       <div class="note" id="notes" hidden></div>
     </div>
     <div class="menu">
+      <button class="newopts" id="goNew" hidden><span class="l"><b id="newTitle">New options</b><span id="newSub"></span></span><span class="arrow">›</span></button>
       <button class="primary" id="goGrid"><span class="l"><b>Quick select</b><span>Tap faces to select them for a scene.</span></span><span class="arrow">›</span></button>
       <button id="goCards"><span class="l"><b>Single select</b><span id="cardsSub">One big photo at a time. Swipe or tap Select / Pass.</span></span><span class="arrow">›</span></button>
       <button id="goReview"><span class="l"><b>Review &amp; send</b><span id="reviewSub"></span></span><span class="arrow">›</span></button>
@@ -301,7 +307,7 @@ pre.out{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.5 ui-monospace,S
       <div class="row"><span class="lab">Name</span><input type="text" id="fName" placeholder="Search names or #…"></div>
       <div class="row"><span class="lab">Age</span><span id="fAge"></span></div>
       <div class="row" id="fGenderRow" hidden><span class="lab">Gender</span><span id="fGender"></span></div>
-      <div class="row"><span class="lab">Show</span><span class="seg" id="ovFilter"><button data-f="all" class="on">All</button><button data-f="open">Not decided</button><button data-f="yes">Selected</button><button data-f="no">Passed</button></span></div>
+      <div class="row"><span class="lab">Show</span><span class="seg" id="ovFilter"><button data-f="all" class="on">All</button><button data-f="open">Not decided</button><button data-f="yes">Selected</button><button data-f="no">Passed</button><button data-f="new" id="fNewBtn" hidden>New</button></span></div>
       <div class="row"><button class="link" id="filterClear">Clear filters</button></div>
     </div>
     <div class="grid" id="ovGrid"></div>
@@ -408,7 +414,9 @@ const selected = () => TALENT.filter(t=>S().picks[t.id] && S().picks[t.id].s);
 const rejected = () => TALENT.filter(t=>S().picks[t.id] && S().picks[t.id].no);
 const undecided = () => TALENT.filter(t=>!S().picks[t.id] && !t.na);
 const countFor = sid => selected().filter(t=>S().picks[t.id].s===sid).length;
-const meta = t => [t.na && 'Unavailable', t.age && ('Age '+t.age), t.size, t.gender].filter(Boolean).join(' · ');
+const meta = t => [t.na && 'Unavailable', t.note, t.age && ('Age '+t.age), t.size, t.gender].filter(Boolean).join(' · ');
+const NEWS = TALENT.filter(t=>t.isNew && !t.na);
+const newPill = t => t.isNew ? '<span class="newpill">New</span>' : '';
 const NAX = (cls='') => `<span class="nax ${cls}" aria-hidden="true"></span>`;
 const byName=(a,b)=>a.name.localeCompare(b.name);
 let activeScene = scenes[0] ? scenes[0].id : null;   // the scene taps and swipes select for
@@ -547,8 +555,16 @@ function renderStart(){
   const n=selected().length;
   $('#reviewSub').textContent = n ? `${n} selected · ${rejected().length} passed · ${undecided().length} not seen` : 'Nothing selected yet';
   renderPeople('#othersWrap','#others', user);
+  const nOpen=NEWS.filter(t=>!state.picks[t.id]);
+  $('#goNew').hidden = !NEWS.length;
+  if(NEWS.length){
+    $('#newTitle').textContent = nOpen.length ? `Go through the ${nOpen.length} new option${nOpen.length>1?'s':''}` : `${NEWS.length} new options`;
+    $('#newSub').textContent = nOpen.length ? 'Added since the first round. One at a time: select for a scene or pass.' : 'All reviewed. Tap to see them again.';
+  }
   setStatus();
 }
+$('#goNew').onclick = () => { const open=NEWS.filter(t=>!state.picks[t.id]).map(t=>t.id); if(open.length){ startDeck(open, 'New options'); } else { filt={name:'',ages:new Set(),genders:new Set(),status:'new'}; show('grid'); } };
+if(NEWS.length) $('#fNewBtn').hidden=false;
 $('#goGrid').onclick = () => show('grid');
 $('#goCards').onclick = () => startDeck();
 $('#goReview').onclick = () => show('review');
@@ -582,7 +598,7 @@ function passes(t){
   if(filt.ages.size && !ageMatch(t,[...filt.ages])) return false;
   if(filt.genders.size && !filt.genders.has(t.gender)) return false;
   const p=state.picks[t.id];
-  return filt.status==='all'||(filt.status==='open'&&!p)||(filt.status==='yes'&&p&&p.s)||(filt.status==='no'&&p&&p.no);
+  return filt.status==='all'||(filt.status==='open'&&!p)||(filt.status==='yes'&&p&&p.s)||(filt.status==='no'&&p&&p.no)||(filt.status==='new'&&t.isNew);
 }
 $('#fName').oninput = e => { filt.name=e.target.value.trim().toLowerCase(); renderGrid(); };
 $('#fAge').innerHTML = AGE_BUCKETS.map((b,i)=>`<button class="fchip" data-a="${i}">${b[0]}</button>`).join(' ');
@@ -598,12 +614,12 @@ function tile(t, opts={}){
   const sel=!!p.s, other=sel && p.s!==activeScene && !opts.review, rej=!!p.no;
   if(t.na) return `<div class="tile na" data-id="${t.id}" data-na="1" title="Unavailable">
     <div class="ph"><img src="${t.img}" alt="" loading="lazy">${NAX()}<span class="natag">Unavailable</span></div>
-    <span class="n"><span class="numtag">${t.num}</span> ${esc(t.name)}</span>
+    <span class="n">${newPill(t)}<span class="numtag">${t.num}</span> ${esc(t.name)}</span>
     <span class="m">${esc(meta(t))}</span>
   </div>`;
-  return `<div class="tile ${sel?'sel':''} ${other?'other':''} ${rej?'rejected':''}" data-id="${t.id}" role="button" tabindex="0" ${sel?scStyle(p.s):''}>
+  return `<div class="tile ${sel?'sel':''} ${other?'other':''} ${rej?'rejected':''} ${t.isNew?'isnew':''}" data-id="${t.id}" role="button" tabindex="0" ${sel?scStyle(p.s):''}>
     <div class="ph"><img src="${t.img}" alt="" loading="lazy"><span class="mark">✓</span>${sel?`<span class="scn">${esc(sceneName(p.s))}</span>`:''}${opts.review?'':`<button class="x" data-x="${t.id}" aria-label="Pass">✕</button><button class="view" data-view="${t.id}">View</button>`}</div>
-    <span class="n"><span class="numtag">${t.num}</span> ${esc(t.name)}</span>
+    <span class="n">${newPill(t)}<span class="numtag">${t.num}</span> ${esc(t.name)}</span>
     <span class="m">${esc(meta(t))}</span>
   </div>`;
 }
@@ -663,9 +679,9 @@ function quotaCheck(){
 }
 
 // ---------- cards (one at a time) ----------
-let deck=[], deckSingle=false, idx=0, lastAction=null, singleReturn='grid';
-function startDeck(ids){
-  deckSingle=false; lastAction=null;
+let deck=[], deckSingle=false, idx=0, lastAction=null, singleReturn='grid', deckTitle='Not yet decided';
+function startDeck(ids, title){
+  deckSingle=false; lastAction=null; deckTitle=title||'Not yet decided';
   deck = ids || undecided().map(t=>t.id);
   idx=0;
   if(!deck.length){ toast('Everyone has been decided. Review to change anyone.'); show('review'); return; }
@@ -678,10 +694,10 @@ function renderSwipe(){
   const p = S().picks[t.id]||{};
   $('#cardSceneBar').hidden = scenes.length<2;
   sceneBar('#sceneRow2');
-  $('#deckLabel').textContent = deckSingle ? '' : 'Not yet decided';
+  $('#deckLabel').textContent = deckSingle ? '' : deckTitle;
   $('#deckPos').textContent = deckSingle ? '' : `${idx+1} of ${deck.length}`;
   $('#deckBar').style.width = deckSingle ? '100%' : (idx/deck.length*100)+'%';
-  $('#stage').innerHTML = `<div class="card ${t.na?'na':''}" id="card" ${scStyle(activeScene)}><div class="stamp yes" id="stYes">Select</div><div class="stamp no" id="stNo">Pass</div><div class="badge">${t.num}</div><img src="${t.img}" alt="${esc(t.name)}">${t.na?NAX('cardx'):''}<div class="cap"><div class="n">${esc(t.name)}</div><div class="m">${esc(meta(t))}</div>${p.s?`<div class="m" style="color:var(--accent)">Selected: ${esc(sceneName(p.s))}</div>`:p.no?`<div class="m" style="color:var(--reject)">Passed</div>`:''}</div></div>`;
+  $('#stage').innerHTML = `<div class="card ${t.na?'na':''}" id="card" ${scStyle(activeScene)}><div class="stamp yes" id="stYes">Select</div><div class="stamp no" id="stNo">Pass</div><div class="badge">${t.num}</div><img src="${t.img}" alt="${esc(t.name)}">${t.na?NAX('cardx'):''}<div class="cap"><div class="n">${newPill(t)}${esc(t.name)}</div><div class="m">${esc(meta(t))}</div>${p.s?`<div class="m" style="color:var(--accent)">Selected: ${esc(sceneName(p.s))}</div>`:p.no?`<div class="m" style="color:var(--reject)">Passed</div>`:''}</div></div>`;
   const sc=sceneObj(activeScene);
   const selLabel = scenes.length>1 ? `✓ Select<small>${esc(sc.name)} · ${countFor(sc.id)}/${sc.count}</small>` : `✓ Select<small class="num">${countFor(sc.id)}/${sc.count}</small>`;
   $('#actions').innerHTML = `<button class="btn fill" data-pick="sel" ${scStyle(activeScene)}>${selLabel}</button><div class="row2"><button class="btn no" data-pick="__no">✕ Pass</button><button class="btn ghost" id="skipBtn">Skip for now</button></div><div class="linkrow"><button class="link" id="undoBtn" ${lastAction?'':'disabled style="opacity:.4"'}>Undo</button><button class="link" id="toReview">Review</button>${deckSingle?'':'<button class="link" id="toGrid">Quick select</button>'}</div><p class="hint">${deckSingle?'':'Swipe right to select, left to pass.'}</p>`;
@@ -792,7 +808,7 @@ function renderReview(){
   $('#reviewSections').querySelectorAll('[data-cast]').forEach(el=>el.onclick=()=>{ if(el.dataset.cast) activeScene=el.dataset.cast; show('grid'); });
   $('#finalizeBtn').disabled = n===0;
 }
-function item(t, ctl, rej){ return `<div class="item ${rej?'rejected':''} ${t.na?'na':''}"><div class="iph"><img src="${t.img}" alt="" loading="lazy">${t.na?NAX():''}</div><div><div class="n"><span class="numtag">${t.num}</span> ${esc(t.name)}</div><div class="m">${esc(meta(t))}</div></div><div class="ctl">${ctl}</div></div>`; }
+function item(t, ctl, rej){ return `<div class="item ${rej?'rejected':''} ${t.na?'na':''}"><div class="iph"><img src="${t.img}" alt="" loading="lazy">${t.na?NAX():''}</div><div><div class="n">${newPill(t)}<span class="numtag">${t.num}</span> ${esc(t.name)}</div><div class="m">${esc(meta(t))}</div></div><div class="ctl">${ctl}</div></div>`; }
 $('#finalizeBtn').onclick=()=>{
   const n=selected().length, short=scenes.filter(s=>countFor(s.id)<s.count);
   const warn = n<totalNeeded ? `<p>You have ${n} of ${totalNeeded} needed${short.length?` (short on ${short.map(s=>esc(s.name)).join(', ')})`:''}. Send anyway?</p>` : n>totalNeeded ? `<p>You have ${n}, which is ${n-totalNeeded} over the ${totalNeeded} needed. That's fine if you want backups.</p>` : `<p>${n} of ${totalNeeded}. Everything lines up.</p>`;
