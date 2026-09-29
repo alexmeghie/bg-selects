@@ -195,6 +195,10 @@ h1,h2,h3{font-family:var(--disp);font-weight:700;line-height:1;margin:0;text-wra
 /* new options added after the first round (agency replacements etc.) */
 .newpill{display:inline-block;font-family:var(--disp);font-weight:700;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:1px 5px;border-radius:3px;background:var(--tbd);color:var(--tbd-ink);vertical-align:2px;margin-right:4px}
 .tile.isnew{border-color:var(--tbd)}
+.newpill.pick{background:var(--accent);color:var(--accent-ink)}
+.tile .npk{position:absolute;top:5px;right:5px;z-index:3;font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:4px;background:#FFD400;color:#1F1A00;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+.tile.npick{box-shadow:0 0 0 3px #FFD400}
+.tally .v.new{color:var(--accent)}
 .menu button.newopts{border:2px solid var(--tbd)}
 .menu button.newopts .l b::before{content:'NEW';font-size:12px;letter-spacing:.08em;padding:2px 6px;border-radius:4px;background:var(--tbd);color:var(--tbd-ink);margin-right:8px;vertical-align:3px}
 /* unavailable talent (agency said N/A): photo crossed out with a red X, can't be selected */
@@ -383,7 +387,7 @@ async function api(payload){
   if(j && j.ok===false && j.error!=='name_taken') throw new Error(j.message||j.error||'sheet error');
   return j;
 }
-function summaryText(){ return scenes.map(s=>`${s.name}: `+selected().filter(t=>state.picks[t.id].s===s.id).map(t=>`#${t.num} ${t.name}`).join(', ')).join('\n'); }
+function summaryText(){ return scenes.map(s=>`${s.name}: `+selected().filter(t=>state.picks[t.id].s===s.id).map(t=>`#${t.num} ${t.name}${tagNew(t)}`).join(', ')).join('\n'); }
 function sync(){ if(!SHEET||!user) return; dirty=true; clearTimeout(syncT); syncT=setTimeout(flush, 900); }
 async function flush(){
   if(!SHEET||!user||syncing||!dirty) return;
@@ -416,7 +420,10 @@ const undecided = () => TALENT.filter(t=>!S().picks[t.id] && !t.na);
 const countFor = sid => selected().filter(t=>S().picks[t.id].s===sid).length;
 const meta = t => [t.na && 'Unavailable', t.note, t.age && ('Age '+t.age), t.size, t.gender].filter(Boolean).join(' · ');
 const NEWS = TALENT.filter(t=>t.isNew && !t.na);
-const newPill = t => t.isNew ? '<span class="newpill">New</span>' : '';
+// A "new pick" = selected since this person's last Send (picks carry sent:true once they've gone out in an email).
+const isNewPick = t => { const st=S(); const p=st.picks[t.id]; return !!(p && p.s && !p.sent && st.sentAt); };
+const newPill = t => (t.isNew ? '<span class="newpill">New</span>' : '') + (isNewPick(t) ? '<span class="newpill pick">New pick</span>' : '');
+const tagNew = t => isNewPick(t) ? ' (NEW)' : '';
 const NAX = (cls='') => `<span class="nax ${cls}" aria-hidden="true"></span>`;
 const byName=(a,b)=>a.name.localeCompare(b.name);
 let activeScene = scenes[0] ? scenes[0].id : null;   // the scene taps and swipes select for
@@ -517,6 +524,9 @@ $('#signinForm').onsubmit = e => {
     online=true; setStatus();
     const remote=clean(j.picks);
     const localN=Object.keys(state.picks).length, remoteN=Object.keys(remote).length;
+    let merged=false; for(const k in remote){ const r=remote[k], l=state.picks[k]; if(r&&r.sent&&l&&l.s&&l.s===r.s&&!l.sent){ l.sent=true; merged=true; } }
+    if(merged){ try{ localStorage.setItem(ukey(), JSON.stringify(state)); }catch(e){} }
+    if(j.sentAt && !state.sentAt){ state.sentAt=j.sentAt; }
     if(j.isNew && localN){
       modal(`<h2>Start fresh?</h2><p>This device has ${localN} decisions saved under ${esc(u.email)}, but the job sheet has none for you. If ${esc(CONFIG.coordinatorName.split(' ')[0])} reset your selects, start fresh; otherwise keep them and they'll be saved to the sheet now.</p><button class="big" id="mFresh">Start fresh</button><button class="big alt" id="mKeep">Keep my ${localN} decisions</button>`);
       $('#mFresh').onclick=()=>{ closeModal(); state={picks:{},finalized:false,sentAt:null}; try{ localStorage.setItem(ukey(), JSON.stringify(state)); }catch(e){} render(); };
@@ -617,8 +627,9 @@ function tile(t, opts={}){
     <span class="n">${newPill(t)}<span class="numtag">${t.num}</span> ${esc(t.name)}</span>
     <span class="m">${esc(meta(t))}</span>
   </div>`;
-  return `<div class="tile ${sel?'sel':''} ${other?'other':''} ${rej?'rejected':''} ${t.isNew?'isnew':''}" data-id="${t.id}" role="button" tabindex="0" ${sel?scStyle(p.s):''}>
-    <div class="ph"><img src="${t.img}" alt="" loading="lazy"><span class="mark">✓</span>${sel?`<span class="scn">${esc(sceneName(p.s))}</span>`:''}${opts.review?'':`<button class="x" data-x="${t.id}" aria-label="Pass">✕</button><button class="view" data-view="${t.id}">View</button>`}</div>
+  const np=isNewPick(t);
+  return `<div class="tile ${sel?'sel':''} ${other?'other':''} ${rej?'rejected':''} ${t.isNew?'isnew':''} ${np&&opts.review?'npick':''}" data-id="${t.id}" role="button" tabindex="0" ${sel?scStyle(p.s):''}>
+    <div class="ph"><img src="${t.img}" alt="" loading="lazy"><span class="mark">✓</span>${np&&opts.review?'<span class="npk">New pick</span>':''}${sel?`<span class="scn">${esc(sceneName(p.s))}</span>`:''}${opts.review?'':`<button class="x" data-x="${t.id}" aria-label="Pass">✕</button><button class="view" data-view="${t.id}">View</button>`}</div>
     <span class="n">${newPill(t)}<span class="numtag">${t.num}</span> ${esc(t.name)}</span>
     <span class="m">${esc(meta(t))}</span>
   </div>`;
@@ -783,7 +794,7 @@ $('#viewSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ view=b.datas
 function renderReview(){
   const n=selected().length;
   $('#viewSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===view));
-  $('#tally').innerHTML = `<div><span class="k">Total</span><span class="v num ${n>=totalNeeded?'ok':'short'}">${n}/${totalNeeded}</span></div>` + scenes.map(s=>{ const c=countFor(s.id); return `<div><span class="k">${esc(s.name)}</span><span class="v num ${c>=s.count?'ok':'short'}">${c}/${s.count}</span></div>`; }).join('') + `<div><span class="k">Not seen</span><span class="v num">${undecided().length}</span></div>`;
+  $('#tally').innerHTML = `<div><span class="k">Total</span><span class="v num ${n>=totalNeeded?'ok':'short'}">${n}/${totalNeeded}</span></div>` + scenes.map(s=>{ const c=countFor(s.id); return `<div><span class="k">${esc(s.name)}</span><span class="v num ${c>=s.count?'ok':'short'}">${c}/${s.count}</span></div>`; }).join('') + `<div><span class="k">Not seen</span><span class="v num">${undecided().length}</span></div>` + (S().sentAt ? `<div><span class="k">New since last send</span><span class="v num new">${selected().filter(isNewPick).length}</span></div>` : '');
   $('#reviewNote').textContent = viewing ? `${viewing.name}'s selects (read-only)` : '';
   const opts = id => scenes.map(s=>`<option value="${s.id}" ${s.id===id?'selected':''}>${esc(s.name)}</option>`).join('');
   let html='';
@@ -825,10 +836,12 @@ function finalText(){
   if(CONFIG.location) lines.push(`Location: ${CONFIG.location}`);
   lines.push(`Selected by: ${user.name}${user.role?' ('+user.role+')':''} <${user.email}>`);
   lines.push(`Total: ${selected().length} of ${totalNeeded} needed`, '');
+  const fresh=selected().filter(isNewPick);
+  if(fresh.length){ lines.push(`NEW SINCE LAST SEND (${fresh.length}): ` + fresh.sort((a,b)=>a.num-b.num).map(t=>`#${t.num} ${t.name} (${sceneName(state.picks[t.id].s)})`).join(', '), ''); }
   for(const s of scenes){
     const list=selected().filter(t=>S().picks[t.id].s===s.id).sort(byName);
     lines.push(`${s.name.toUpperCase()} (${list.length}/${s.count})`);
-    list.forEach(t=>lines.push(`#${t.num} ${t.name}${t.age?' — '+t.age:''}${t.size?', '+t.size:''}`));
+    list.forEach(t=>lines.push(`#${t.num} ${t.name}${t.age?' — '+t.age:''}${t.size?', '+t.size:''}${tagNew(t)}`));
     lines.push('');
   }
   const rej=rejected().sort(byName);
@@ -859,16 +872,17 @@ function renderFinal(){
 }
 $('#toggleList').onclick=()=>{ listOpen=!listOpen; renderFinal(); };
 function mailto(txt){ return `mailto:${encodeURIComponent(CONFIG.coordinatorEmail)}?subject=${encodeURIComponent('BG Selects – '+CONFIG.jobName+' – '+user.name)}&body=${encodeURIComponent(txt)}`; }
+function markSent(){ for(const k in state.picks){ const p=state.picks[k]; if(p&&p.s) p.sent=true; } dirty=true; }
 async function send(){
   if(sending) return; sending=true; renderFinal();
   const txt=finalText();
   try{
     if(SHEET){
       const copyMe = state.copyMe!==false;
-      const sceneLists = scenes.map(s=>({name:s.name, count:s.count, people:selected().filter(t=>state.picks[t.id].s===s.id).sort(byName).map(t=>({num:t.num,name:t.name,age:t.age,size:t.size,img:t.img}))}));
+      const sceneLists = scenes.map(s=>({name:s.name, count:s.count, people:selected().filter(t=>state.picks[t.id].s===s.id).sort(byName).map(t=>({num:t.num,name:t.name+tagNew(t),age:t.age,size:t.size,img:t.img}))}));
       const j=await api({action:'send', jobKey:CONFIG.jobKey, jobName:CONFIG.jobName, client:CONFIG.client, shootDates:CONFIG.shootDates, location:CONFIG.location, user, picks:state.picks, finalized:true, summary:summaryText(), coordinatorEmail:CONFIG.coordinatorEmail, coordinatorName:CONFIG.coordinatorName, text:txt, sendCopy:copyMe, sceneLists, total:`${selected().length} of ${totalNeeded} BG`});
       if(!j.ok) throw new Error(j.message||'sheet error');
-      state.sentAt=j.sentAt||new Date().toISOString(); state.copySent=copyMe; dirty=false; save(); toast('Sent.'); sending=false; renderFinal(); return;
+      markSent(); state.sentAt=j.sentAt||new Date().toISOString(); state.copySent=copyMe; dirty=false; save(); toast('Sent.'); sending=false; renderFinal(); return;
     }
     const res=await fetch('https://api.web3forms.com/submit',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({
       access_key:CONFIG.web3formsKey,
@@ -879,7 +893,7 @@ async function send(){
     })});
     const j=await res.json().catch(()=>({}));
     if(!res.ok || !j.success) throw new Error(j.message||('HTTP '+res.status));
-    state.sentAt=new Date().toISOString(); save(); toast('Sent.');
+    markSent(); state.sentAt=new Date().toISOString(); save(); toast('Sent.');
   }catch(e){
     modal(`<h2>Couldn't send</h2><p>The email service didn't accept it (${esc(e.message||'no connection')}). Copy the list and email it to ${esc(CONFIG.coordinatorEmail)}, or try again.</p><a class="big" href="${mailto(txt)}">Open in my mail app</a><button class="big alt" id="mCopy">Copy the list</button><button class="link" id="mClose">Close</button>`);
     $('#mCopy').onclick=()=>{copy();closeModal();}; $('#mClose').onclick=closeModal;
