@@ -26,6 +26,7 @@
   --shadow:0 10px 30px rgba(0,0,0,.45);
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html{overflow-x:hidden;max-width:100%}
 body{min-height:100%;max-width:100%;overflow-x:clip}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
@@ -95,6 +96,9 @@ h1,h2,h3{font-family:var(--disp);font-weight:700;line-height:1;margin:0;text-wra
 .big{border-radius:10px;padding:15px;font-family:var(--disp);font-weight:700;font-size:21px;letter-spacing:.04em;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);text-align:center;display:block;text-decoration:none;width:100%;line-height:1}
 .big.alt{background:var(--card);color:var(--ink);border:2px solid var(--line)}
 .big[disabled]{opacity:.5;cursor:not-allowed}
+.menu button.big{justify-content:center;background:var(--accent);color:var(--accent-ink);border:2px solid var(--accent);border-radius:10px;padding:15px}
+.menu button.big.alt{background:var(--card);color:var(--ink);border-color:var(--line)}
+.menu button.link{background:none;border:0;padding:6px;justify-content:center;color:var(--accent)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--card);flex-wrap:wrap;max-width:100%}
 .seg button{padding:8px 12px;font-size:14px;font-weight:500;border-right:1px solid var(--line)}
 .seg button:last-child{border-right:0}
@@ -228,6 +232,7 @@ pre.out{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.5 ui-monospace,S
 .sent{border:2px solid var(--accent);border-radius:10px;padding:14px 16px;display:grid;gap:6px}
 .sent b{font-family:var(--disp);font-size:22px;letter-spacing:.02em}
 .sent.ok{background:var(--accent-soft)}
+.sent.bad{border-color:var(--tbd);background:color-mix(in srgb,var(--tbd) 14%,var(--card))}
 .check{display:flex;align-items:center;gap:10px;font-size:15px;color:var(--ink);padding:4px 2px}
 .check input{width:20px;height:20px;margin:0;flex:none}
 
@@ -564,6 +569,7 @@ function renderStart(){
   slate('', true);
   const n=selected().length;
   $('#reviewSub').textContent = n ? `${n} selected · ${rejected().length} passed · ${undecided().length} not seen` : 'Nothing selected yet';
+  { const ch=changesSinceSend(); if(ch.total) $('#reviewSub').textContent += ` · ${ch.total} change${ch.total>1?'s':''} not sent yet`; else if(state.sentAt) $('#reviewSub').textContent += ' · sent'; }
   renderPeople('#othersWrap','#others', user);
   const nOpen=NEWS.filter(t=>!state.picks[t.id]);
   $('#goNew').hidden = !NEWS.length;
@@ -853,11 +859,20 @@ function renderFinal(){
   const txt=finalText();
   $('#finalText').textContent=txt; $('#finalText').hidden=!listOpen; $('#toggleList').textContent=listOpen?'Hide list':'Show list';
   const box=$('#sentBox');
-  if(state.sentAt){
+  const ch=changesSinceSend();
+  const when = state.sentAt ? new Date(state.sentAt).toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}) : '';
+  const first = CONFIG.coordinatorName.split(' ')[0];
+  if(state.sentAt && ch.total){
+    box.className='sent bad';
+    $('#sentTitle').textContent='Changes not sent yet';
+    const parts=[ch.added?`${ch.added} new pick${ch.added>1?'s':''}`:'', ch.removed?`${ch.removed} removed`:''].filter(Boolean).join(' and ');
+    $('#finalSummary').textContent=`You've made changes (${parts}) since your last send on ${when}. ${first} still has the old list. Send the updated list so the bookings match.`;
+    $('#finalActions').innerHTML=`<label class="check"><input type="checkbox" id="copyMe" ${state.copyMe!==false?'checked':''}>Email me a copy (PDF with photos) at ${esc(user.email)}</label><button class="big" id="sendBtn">${sending?'Sending…':'Send updated list to '+first}</button><button class="big alt" id="copyBtn">Copy the list</button>`;
+  } else if(state.sentAt){
     box.className='sent ok';
-    $('#sentTitle').textContent='Sent to '+CONFIG.coordinatorName;
-    $('#finalSummary').textContent=`${selected().length} selects emailed ${new Date(state.sentAt).toLocaleString()}${state.copySent?`, with a copy to ${user.email}`:''}. Change anything and you can send again.`;
-    $('#finalActions').innerHTML=`<button class="big alt" id="sendBtn">Send again</button><button class="big alt" id="copyBtn">Copy the list</button>`;
+    $('#sentTitle').textContent='✓ '+first+' has your latest list';
+    $('#finalSummary').textContent=`All ${selected().length} selects were emailed on ${when}${state.copySent?`, with a copy to ${user.email}`:''}. Nothing has changed since. If you change anyone later, come back here to send the update.`;
+    $('#finalActions').innerHTML=`<button class="big alt" id="copyBtn">Copy the list</button><button class="link" id="sendBtn" style="justify-self:center">Resend the same list</button>`;
   } else {
     box.className='sent';
     $('#sentTitle').textContent='Ready to send';
@@ -872,7 +887,14 @@ function renderFinal(){
 }
 $('#toggleList').onclick=()=>{ listOpen=!listOpen; renderFinal(); };
 function mailto(txt){ return `mailto:${encodeURIComponent(CONFIG.coordinatorEmail)}?subject=${encodeURIComponent('BG Selects – '+CONFIG.jobName+' – '+user.name)}&body=${encodeURIComponent(txt)}`; }
-function markSent(){ for(const k in state.picks){ const p=state.picks[k]; if(p&&p.s) p.sent=true; } dirty=true; }
+function markSent(){ const ids=[]; for(const k in state.picks){ const p=state.picks[k]; if(p&&p.s){ p.sent=true; ids.push(k); } } state.sentIds=ids; dirty=true; }
+// What changed since the last send: new picks (incl. scene moves) and people dropped from the list.
+function changesSinceSend(){
+  if(!state.sentAt) return {added:0, removed:0, total:0};
+  const added=selected().filter(isNewPick).length;
+  const removed=(state.sentIds||[]).filter(k=>{ const p=state.picks[k]; return !(p&&p.s&&p.sent); }).length;
+  return {added, removed, total:added+removed};
+}
 async function send(){
   if(sending) return; sending=true; renderFinal();
   const txt=finalText();
