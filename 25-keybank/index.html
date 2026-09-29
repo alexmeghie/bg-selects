@@ -392,10 +392,14 @@ window.addEventListener('pagehide', ()=>{ if(dirty && SHEET && user && navigator
 let state = {picks:{}, finalized:false, sentAt:null};
 const ekey = e => String(e||'').trim().toLowerCase();
 function ukey(){ return KEYBASE + ':' + slug(ekey(user.email)); }
-function load(){ state={picks:{},finalized:false,sentAt:null}; try{ const raw=localStorage.getItem(ukey()); if(raw) state=Object.assign(state, JSON.parse(raw)); }catch(e){} }
+// Unavailable talent are dropped from everyone's picks, including copies saved on a selector's device,
+// so an old device copy can never push them back into the job sheet.
+function clean(picks){ const o={}; for(const k in (picks||{})){ if(!(byId[k]&&byId[k].na)) o[k]=picks[k]; } return o; }
+const selCount = picks => Object.values(clean(picks)).filter(p=>p&&p.s).length;
+function load(){ state={picks:{},finalized:false,sentAt:null}; try{ const raw=localStorage.getItem(ukey()); if(raw) state=Object.assign(state, JSON.parse(raw)); }catch(e){} const before=Object.keys(state.picks||{}).length; state.picks=clean(state.picks); if(Object.keys(state.picks).length!==before){ try{ localStorage.setItem(ukey(), JSON.stringify(state)); }catch(e){} } }
 function save(){ try{ localStorage.setItem(ukey(), JSON.stringify(state)); }catch(e){} sync(); }
 function knownUsers(){ try{ return JSON.parse(localStorage.getItem(KEYBASE+':users')||'[]'); }catch(e){ return []; } }
-function loadFor(u){ try{ const raw=localStorage.getItem(KEYBASE+':'+slug(ekey(u.email))); return raw?JSON.parse(raw):null; }catch(e){ return null; } }
+function loadFor(u){ try{ const raw=localStorage.getItem(KEYBASE+':'+slug(ekey(u.email))); if(!raw) return null; const st=JSON.parse(raw); st.picks=clean(st.picks); return st; }catch(e){ return null; } }
 function rememberUser(u){ try{ const list=knownUsers().filter(x=>ekey(x.email)!==ekey(u.email)); list.unshift(u); localStorage.setItem(KEYBASE+':users', JSON.stringify(list.slice(0,6))); localStorage.setItem(KEYBASE+':last', JSON.stringify(u)); }catch(e){} }
 
 const sceneName = id => (scenes.find(s=>s.id===id)||{}).name || id;
@@ -503,7 +507,7 @@ $('#signinForm').onsubmit = e => {
     if(j.name && j.name!==u.name) toast(`Welcome back. Name updated from "${j.name}" to "${u.name}".`);
     signIn(u);
     online=true; setStatus();
-    const remote=j.picks||{};
+    const remote=clean(j.picks);
     const localN=Object.keys(state.picks).length, remoteN=Object.keys(remote).length;
     if(j.isNew && localN){
       modal(`<h2>Start fresh?</h2><p>This device has ${localN} decisions saved under ${esc(u.email)}, but the job sheet has none for you. If ${esc(CONFIG.coordinatorName.split(' ')[0])} reset your selects, start fresh; otherwise keep them and they'll be saved to the sheet now.</p><button class="big" id="mFresh">Start fresh</button><button class="big alt" id="mKeep">Keep my ${localN} decisions</button>`);
@@ -515,13 +519,13 @@ $('#signinForm').onsubmit = e => {
   .finally(()=>{ btn.disabled=false; btn.textContent='Start'; });
 };
 function signIn(u){ user=u; viewing=null; viewState=null; rememberUser(u); load(); show('start'); }
-function viewOther(u){ viewing=u; viewState=u.picks?{picks:u.picks,finalized:!!u.finalized,sentAt:u.sent||null}:(loadFor(u)||{picks:{},finalized:false,sentAt:null}); show('review'); }
+function viewOther(u){ viewing=u; viewState=u.picks?{picks:clean(u.picks),finalized:!!u.finalized,sentAt:u.sent||null}:(loadFor(u)||{picks:{},finalized:false,sentAt:null}); show('review'); }
 let peopleCache=null, peopleAt=0;
 function renderPeople(wrapSel, listSel, exclude){
   const draw = list => {
     const ppl=list.filter(u=>!exclude||(u.emailKey?u.emailKey!==exclude.emailKey:ekey(u.email)!==ekey(exclude.email)));
     $(wrapSel).hidden=!ppl.length;
-    $(listSel).innerHTML=ppl.map((u,i)=>`<button type="button" data-i="${i}">${esc(u.name)}${u.role?' ('+esc(u.role)+')':''} · ${u.selected}${u.finalized?' ✓':''}</button>`).join('');
+    $(listSel).innerHTML=ppl.map((u,i)=>`<button type="button" data-i="${i}">${esc(u.name)}${u.role?' ('+esc(u.role)+')':''} · ${u.picks?selCount(u.picks):u.selected}${u.finalized?' ✓':''}</button>`).join('');
     $(listSel).querySelectorAll('button').forEach(b=>b.onclick=()=>viewOther(ppl[+b.dataset.i]));
   };
   const local = () => knownUsers().map(u=>{ const st=loadFor(u)||{picks:{}}; return Object.assign({}, u, {picks:st.picks, selected:Object.values(st.picks).filter(p=>p.s).length, finalized:!!st.finalized}); });
