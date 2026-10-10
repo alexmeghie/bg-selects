@@ -273,7 +273,7 @@ pre.out{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.5 ui-monospace,S
       <dl id="jobMeta0"><dt>Client</dt><dd>Principal Financial</dd><dt>Prod co</dt><dd>Smuggler / Soft Citizen</dd><dt>Director</dt><dd>Tucker Bliss</dd><dt>Shoot days</dt><dd>October 15-18</dd><dt>Location</dt><dd>Toronto, ON</dd><dt>Total BG</dt><dd>100 needed · 229 available</dd></dl>
       <div>
         <div class="eyebrow" style="margin-bottom:8px">Background needed</div>
-        <div class="scenes" id="sceneChips0"><span class="chip" style="border-left:5px solid #7CFC00"><b class="num">20</b> Day 1 - Lars’ World needed</span><span class="chip" style="border-left:5px solid #FF8A00"><b class="num">25</b> Day 2 - Ned’s World needed</span><span class="chip" style="border-left:5px solid #3EC7FF"><b class="num">20</b> Day 3 - Sophie’s World needed</span><span class="chip" style="border-left:5px solid #FF5FA8"><b class="num">35</b> Day 4 - Sophie’s World needed</span></div>
+        <div class="scenes" id="sceneChips0"><span class="chip" style="border-left:5px solid #7CFC00">Day 1 - Lars’ World <b class="num">20</b> needed</span><span class="chip" style="border-left:5px solid #FF8A00">Day 2 - Ned’s World <b class="num">25</b> needed</span><span class="chip" style="border-left:5px solid #3EC7FF">Day 3 - Sophie’s World <b class="num">20</b> needed</span><span class="chip" style="border-left:5px solid #FF5FA8">Day 4 - Sophie’s World <b class="num">35</b> needed</span></div>
       </div>
       <div class="note" id="notes0" >Welcome to the BG Selects Tool!</div>
     </div>
@@ -511,7 +511,7 @@ function slate(suffix, compact){
     : [['Client',CONFIG.client],['Prod co',CONFIG.prodCo],['Director',CONFIG.director],['Shoot days',CONFIG.shootDates],['Location',CONFIG.location],['Total BG',`${totalNeeded} needed · ${TALENT.length} available`]].filter(x=>x[1]);
   $('#jobMeta'+suffix).innerHTML = rows.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
   const nt=$('#notes'+suffix); nt.hidden=!CONFIG.notes; nt.textContent=CONFIG.notes||'';
-  $('#sceneChips'+suffix).innerHTML = scenes.map(s=>`<span class="chip" style="border-left:5px solid ${sceneColor(s.id)}"><b class="num">${user?countFor(s.id)+'/':''}${s.count}</b> ${esc(s.name)}${!user?' needed':''}</span>`).join('');
+  $('#sceneChips'+suffix).innerHTML = scenes.map(s=>`<span class="chip" style="border-left:5px solid ${sceneColor(s.id)}">${esc(s.name)} <b class="num">${user?countFor(s.id)+'/':''}${s.count}</b>${!user?' needed':''}</span>`).join('');
 }
 
 // ---------- sign in ----------
