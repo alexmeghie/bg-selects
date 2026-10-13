@@ -148,7 +148,9 @@ h1,h2,h3{font-family:var(--disp);font-weight:700;line-height:1;margin:0;text-wra
 .tile.sel .mark{display:flex}
 
 .tile .scn{position:absolute;bottom:0;left:0;right:0;font-family:var(--disp);font-weight:600;font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:3px 6px;background:var(--sc);color:#0B1A00;border-radius:0 0 6px 6px;display:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tile.sel .scn{display:block}
+.tile.sel .scn{display:flex;gap:4px;align-items:center}
+.tile .scn .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.tile .scn .more{flex:none;background:rgba(11,26,0,.82);color:#fff;border-radius:3px;padding:0 4px;font-size:10px;line-height:14px}
 .tile .x{position:absolute;top:5px;right:5px;width:28px;height:28px;border-radius:50%;background:rgba(22,25,29,.55);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1}
 .tile.rejected img{filter:grayscale(1) brightness(.55);opacity:.35}
 .tile.rejected .x{background:var(--reject)}
@@ -403,7 +405,7 @@ async function api(payload){
   if(j && j.ok===false && j.error!=='name_taken') throw new Error(j.message||j.error||'sheet error');
   return j;
 }
-function summaryText(){ return scenes.map(s=>`${s.name}: `+selected().filter(t=>state.picks[t.id].s===s.id).map(t=>`#${t.num} ${t.name}${tagNew(t)}`).join(', ')).join('\n'); }
+function summaryText(){ return scenes.map(s=>`${s.name}: `+selected().filter(t=>inSc(t,s.id)).map(t=>`#${t.num} ${t.name}${tagNew(t)}`).join(', ')).join('\n'); }
 function sync(){ if(!SHEET||!user) return; dirty=true; clearTimeout(syncT); syncT=setTimeout(flush, 900); }
 async function flush(){
   if(!SHEET||!user||syncing||!dirty) return;
@@ -433,11 +435,26 @@ const sceneObj = id => scenes.find(s=>s.id===id) || scenes[0];
 const selected = () => TALENT.filter(t=>S().picks[t.id] && S().picks[t.id].s);
 const rejected = () => TALENT.filter(t=>S().picks[t.id] && S().picks[t.id].no);
 const undecided = () => TALENT.filter(t=>!S().picks[t.id] && !t.na);
-const countFor = sid => selected().filter(t=>S().picks[t.id].s===sid).length;
+// A pick can sit in several scenes (days/roles): p.s = first scene, p.x = any extra scenes.
+const scOf = p => (p && p.s) ? [p.s, ...((p.x||[]).filter(x=>x!==p.s))] : [];
+const inSc = (t, sid) => scOf(S().picks[t.id]).includes(sid);
+const countFor = sid => selected().filter(t=>inSc(t,sid)).length;
+const slots = () => scenes.reduce((a,s)=>a+countFor(s.id),0);           // one person on two days fills two spots
+const sceneNames = p => scOf(p).map(sceneName).join(' + ');
+function setScenes(p, list){                                             // write a pick's scene list, keeping its sent history
+  const ix=id=>{ const i=scenes.findIndex(s=>s.id===id); return i<0?99:i; };
+  list=[...new Set(list)].sort((a,b)=>ix(a)-ix(b));
+  if(p.sent && !p.sentSc) p.sentSc=[p.s];
+  if(!list.length) return null;
+  p.s=list[0]; if(list.length>1) p.x=list.slice(1); else delete p.x; delete p.no;
+  return p;
+}
+function addScene(id, sid){ const p=state.picks[id]; if(p && p.s){ setScenes(p, [...scOf(p), sid]); } else state.picks[id]={s:sid}; }
+function dropScene(id, sid){ const p=state.picks[id]; if(!p||!p.s) return; const r=setScenes(p, scOf(p).filter(x=>x!==sid)); if(!r) delete state.picks[id]; }
 const meta = t => [t.na && 'Unavailable', t.note, t.age && ('Age '+t.age), t.size, t.gender].filter(Boolean).join(' · ');
 const NEWS = TALENT.filter(t=>t.isNew && !t.na);
 // A "new pick" = selected since this person's last Send (picks carry sent:true once they've gone out in an email).
-const isNewPick = t => { const st=S(); const p=st.picks[t.id]; return !!(p && p.s && !p.sent && st.sentAt); };
+const isNewPick = t => { const st=S(); const p=st.picks[t.id]; if(!(p && p.s && st.sentAt)) return false; if(!p.sent) return true; const was=p.sentSc||[p.s]; return scOf(p).some(x=>!was.includes(x)); };
 const newPill = t => (t.isNew ? '<span class="newpill">New</span>' : '') + (isNewPick(t) ? '<span class="newpill pick">New pick</span>' : '');
 const tagNew = t => isNewPick(t) ? ' (NEW)' : '';
 const NAX = (cls='') => `<span class="nax ${cls}" aria-hidden="true"></span>`;
@@ -483,7 +500,7 @@ $('#backBtn').onclick = () => H.back();
 function render(){
   $('#barTitle').textContent = CONFIG.jobName;
   $('#barWho').textContent = viewing ? `Viewing: ${viewing.name} (read-only)` : user ? `${user.name}'s selects` : '';
-  if(user||viewing){ const n=selected().length; $('#barCount').textContent=`${n} / ${totalNeeded}`; $('#barCount').classList.toggle('warn', n>totalNeeded); $('#barCount').hidden=false; }
+  if(user||viewing){ const n=slots(); $('#barCount').textContent=`${n} / ${totalNeeded}`; $('#barCount').classList.toggle('warn', n>totalNeeded); $('#barCount').hidden=false; }
   else $('#barCount').hidden=true;
   ({signin:renderSignin, start:renderStart, grid:renderGrid, swipe:renderSwipe, review:renderReview, final:renderFinal})[screen]();
 }
@@ -638,15 +655,17 @@ $('#filterClear').onclick=()=>{ filt={name:'',ages:new Set(),genders:new Set(),s
 // ---------- grid (quick select) ----------
 function tile(t, opts={}){
   const p=S().picks[t.id]||{};
-  const sel=!!p.s, other=sel && p.s!==activeScene && !opts.review, rej=!!p.no;
+  const sel=!!p.s, other=sel && !scOf(p).includes(activeScene) && !opts.review, rej=!!p.no;
+  const scs=scOf(p), here=opts.scene || (scs.includes(activeScene)?activeScene:scs[0]);
+  const tag=sel ? `<span class="nm">${esc(sceneName(here))}</span>${scs.length>1?`<b class="more">+${scs.length-1}</b>`:''}` : '';
   if(t.na) return `<div class="tile na" data-id="${t.id}" data-na="1" title="Unavailable">
     <div class="ph"><img src="${t.img}" alt="" loading="lazy">${NAX()}<span class="natag">Unavailable</span></div>
     <span class="n">${newPill(t)}<span class="numtag">${t.num}</span> ${esc(t.name)}</span>
     <span class="m">${esc(meta(t))}</span>
   </div>`;
   const np=isNewPick(t);
-  return `<div class="tile ${sel?'sel':''} ${other?'other':''} ${rej?'rejected':''} ${t.isNew?'isnew':''} ${np&&opts.review?'npick':''}" data-id="${t.id}" role="button" tabindex="0" ${sel?scStyle(p.s):''}>
-    <div class="ph"><img src="${t.img}" alt="" loading="lazy"><span class="mark">✓</span>${np&&opts.review?'<span class="npk">New pick</span>':''}${sel?`<span class="scn">${esc(sceneName(p.s))}</span>`:''}${opts.review?'':`<button class="x" data-x="${t.id}" aria-label="Pass">✕</button><button class="view" data-view="${t.id}">View</button>`}</div>
+  return `<div class="tile ${sel?'sel':''} ${other?'other':''} ${rej?'rejected':''} ${t.isNew?'isnew':''} ${np&&opts.review?'npick':''}" data-id="${t.id}" role="button" tabindex="0" ${sel?scStyle(here):''} ${scs.length>1?`title="${esc(sceneNames(p))}"`:''}>
+    <div class="ph"><img src="${t.img}" alt="" loading="lazy"><span class="mark">✓</span>${np&&opts.review?'<span class="npk">New pick</span>':''}${sel?`<span class="scn">${tag}</span>`:''}${opts.review?'':`<button class="x" data-x="${t.id}" aria-label="Pass">✕</button><button class="view" data-view="${t.id}">View</button>`}</div>
     <span class="n">${newPill(t)}<span class="numtag">${t.num}</span> ${esc(t.name)}</span>
     <span class="m">${esc(meta(t))}</span>
   </div>`;
@@ -674,8 +693,8 @@ let quotaShown=false;
 function toggleSelect(id){
   if(byId[id] && byId[id].na){ toast('Unavailable for this shoot.'); return; }
   const p=state.picks[id]||{};
-  if(p.s===activeScene){ delete state.picks[id]; }
-  else { state.picks[id]={s:activeScene}; }
+  if(scOf(p).includes(activeScene)){ dropScene(id, activeScene); }
+  else { const had=scOf(p).length; addScene(id, activeScene); if(had) toast(`Added to ${sceneName(activeScene)} too · now on ${scOf(state.picks[id]).length} scenes`); }
   save();
   const el=document.querySelector(`.tile[data-id="${id}"]`);
   if(el){ el.outerHTML = tile(byId[id]); rebind(id); }
@@ -696,9 +715,9 @@ function rebind(id){
   const x=el.querySelector('[data-x]'); if(x) x.onclick=e=>{ e.stopPropagation(); togglePass(id); };
   const v=el.querySelector('[data-view]'); if(v) v.onclick=e=>{ e.stopPropagation(); openSingle(id); };
 }
-function render_bar(){ const n=selected().length; $('#barCount').textContent=`${n} / ${totalNeeded}`; $('#barCount').classList.toggle('warn', n>totalNeeded); }
+function render_bar(){ const n=slots(); $('#barCount').textContent=`${n} / ${totalNeeded}`; $('#barCount').classList.toggle('warn', n>totalNeeded); }
 function quotaCheck(){
-  const n=selected().length;
+  const n=slots();
   if(n>=totalNeeded && !quotaShown){
     quotaShown=true;
     modal(`<h2>You've reached ${totalNeeded}</h2><p>You can keep going and trim later, or review what you have.</p><button class="big" id="mKeep">Keep selecting</button><button class="big alt" id="mReview">Review &amp; send</button>`);
@@ -725,7 +744,7 @@ function renderSwipe(){
   $('#deckLabel').textContent = deckSingle ? '' : deckTitle;
   $('#deckPos').textContent = deckSingle ? '' : `${idx+1} of ${deck.length}`;
   $('#deckBar').style.width = deckSingle ? '100%' : (idx/deck.length*100)+'%';
-  $('#stage').innerHTML = `<div class="card ${t.na?'na':''}" id="card" ${scStyle(activeScene)}><div class="stamp yes" id="stYes">Select</div><div class="stamp no" id="stNo">Pass</div><div class="badge">${t.num}</div><img src="${t.img}" alt="${esc(t.name)}">${t.na?NAX('cardx'):''}<div class="cap"><div class="n">${newPill(t)}${esc(t.name)}</div><div class="m">${esc(meta(t))}</div>${p.s?`<div class="m" style="color:var(--accent)">Selected: ${esc(sceneName(p.s))}</div>`:p.no?`<div class="m" style="color:var(--reject)">Passed</div>`:''}</div></div>`;
+  $('#stage').innerHTML = `<div class="card ${t.na?'na':''}" id="card" ${scStyle(activeScene)}><div class="stamp yes" id="stYes">Select</div><div class="stamp no" id="stNo">Pass</div><div class="badge">${t.num}</div><img src="${t.img}" alt="${esc(t.name)}">${t.na?NAX('cardx'):''}<div class="cap"><div class="n">${newPill(t)}${esc(t.name)}</div><div class="m">${esc(meta(t))}</div>${p.s?`<div class="m" style="color:var(--accent)">Selected: ${esc(sceneNames(p))}</div>`:p.no?`<div class="m" style="color:var(--reject)">Passed</div>`:''}</div></div>`;
   const sc=sceneObj(activeScene);
   const selLabel = scenes.length>1 ? `✓ Select<small>${esc(sc.name)} · ${countFor(sc.id)}/${sc.count}</small>` : `✓ Select<small class="num">${countFor(sc.id)}/${sc.count}</small>`;
   $('#actions').innerHTML = `<button class="btn fill" data-pick="sel" ${scStyle(activeScene)}>${selLabel}</button><div class="row2"><button class="btn no" data-pick="__no">✕ Pass</button><button class="btn ghost" id="skipBtn">Skip for now</button></div><div class="linkrow"><button class="link" id="undoBtn" ${lastAction?'':'disabled style="opacity:.4"'}>Undo</button><button class="link" id="toReview">Review</button>${deckSingle?'':'<button class="link" id="toGrid">Quick select</button>'}</div><p class="hint">${deckSingle?'':'Swipe right to select, left to pass.'}</p>`;
@@ -745,7 +764,7 @@ function flyOut(dir, then){
 }
 function decide(id, pick){
   const before = state.picks[id] ? JSON.parse(JSON.stringify(state.picks[id])) : null;
-  if(pick==='__no') state.picks[id]={no:true}; else state.picks[id]={s:pick};
+  if(pick==='__no') state.picks[id]={no:true}; else addScene(id, pick);
   lastAction={id, before};
   save();
   flyOut(pick==='__no'?'left':'right', ()=>advance(pick));
@@ -754,7 +773,7 @@ function skip(){ flyOut('down', ()=>advance('skip')); }
 function advance(pick){
   if(deckSingle){ H.back(); return; }
   if(pick==='skip'){ deck.push(deck.splice(idx,1)[0]); } else { idx++; }
-  const n=selected().length;
+  const n=slots();
   if(pick!=='skip' && pick!=='__no' && n>=totalNeeded && !quotaShown && idx<deck.length){
     quotaShown=true;
     modal(`<h2>You've reached ${totalNeeded}</h2><p>${deck.length-idx} still to see. Keep going and trim later, or review what you have.</p><button class="big" id="mKeep">Keep going</button><button class="big alt" id="mReview">Review &amp; send</button>`);
@@ -809,17 +828,17 @@ document.addEventListener('keydown', e=>{
 let view='collection';
 $('#viewSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ view=b.dataset.v; renderReview(); });
 function renderReview(){
-  const n=selected().length;
+  const n=slots();
   $('#viewSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===view));
   $('#tally').innerHTML = `<div><span class="k">Total</span><span class="v num ${n>=totalNeeded?'ok':'short'}">${n}/${totalNeeded}</span></div>` + scenes.map(s=>{ const c=countFor(s.id); return `<div><span class="k">${esc(s.name)}</span><span class="v num ${c>=s.count?'ok':'short'}">${c}/${s.count}</span></div>`; }).join('') + `<div><span class="k">Not seen</span><span class="v num">${undecided().length}</span></div>` + (S().sentAt ? `<div><span class="k">New since last send</span><span class="v num new">${selected().filter(isNewPick).length}</span></div>` : '');
   $('#reviewNote').textContent = viewing ? `${viewing.name}'s selects (read-only)` : '';
   const opts = id => scenes.map(s=>`<option value="${s.id}" ${s.id===id?'selected':''}>${esc(s.name)}</option>`).join('');
   let html='';
   for(const s of scenes){
-    const list=selected().filter(t=>S().picks[t.id].s===s.id).sort(byName);
+    const list=selected().filter(t=>inSc(t,s.id)).sort(byName);
     const body = view==='collection'
-      ? `<div class="grid">${list.map(t=>tile(t,{review:true})).join('')}</div>`
-      : `<div class="list">${list.map(t=>item(t, viewing?'':`<select aria-label="Scene" data-move="${t.id}">${opts(s.id)}</select><button class="xb no" data-rej="${t.id}">Pass</button>`)).join('')}</div>`;
+      ? `<div class="grid">${list.map(t=>tile(t,{review:true, scene:s.id})).join('')}</div>`
+      : `<div class="list">${list.map(t=>{ const multi=scOf(S().picks[t.id]).length>1; return item(t, viewing?'':`<select aria-label="Scene" data-move="${t.id}" data-from="${s.id}">${opts(s.id)}</select><button class="xb no" data-rej="${t.id}" data-from="${s.id}">${multi?'Remove':'Pass'}</button>`); }).join('')}</div>`;
     html+=`<div class="section"><h2><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${sceneColor(s.id)};margin-right:8px;vertical-align:baseline"></span>${esc(s.name)} <span class="c num">${list.length} of ${s.count}</span></h2>${list.length?body:`<p class="muted">No one yet.${viewing?'':` <button class="link" data-cast="${s.id}">Select for ${esc(s.name)}</button>`}</p>`}</div>`;
   }
   const rej=rejected().sort(byName);
@@ -830,15 +849,15 @@ function renderReview(){
   $('#reviewFoot').hidden = !!viewing;
   if(viewing){ $('#reviewSections').querySelectorAll('.tile').forEach(b=>{ b.style.cursor='default'; }); return; }
   $('#reviewSections').querySelectorAll('.tile:not(.na)').forEach(b=>b.onclick=()=>openSingle(b.dataset.id));
-  $('#reviewSections').querySelectorAll('[data-move]').forEach(el=>el.onchange=()=>{ state.picks[el.dataset.move]={s:el.value}; save(); render(); });
-  $('#reviewSections').querySelectorAll('[data-rej]').forEach(el=>el.onclick=()=>{ state.picks[el.dataset.rej]={no:true}; save(); render(); });
+  $('#reviewSections').querySelectorAll('[data-move]').forEach(el=>el.onchange=()=>{ const id=el.dataset.move, p=state.picks[id]; setScenes(p, scOf(p).map(x=>x===el.dataset.from?el.value:x)); save(); render(); });
+  $('#reviewSections').querySelectorAll('[data-rej]').forEach(el=>el.onclick=()=>{ const id=el.dataset.rej; if(scOf(state.picks[id]).length>1) dropScene(id, el.dataset.from); else state.picks[id]={no:true}; save(); render(); });
   $('#reviewSections').querySelectorAll('[data-restore]').forEach(el=>el.onclick=()=>{ delete state.picks[el.dataset.restore]; save(); openSingle(el.dataset.restore); });
   $('#reviewSections').querySelectorAll('[data-cast]').forEach(el=>el.onclick=()=>{ if(el.dataset.cast) activeScene=el.dataset.cast; show('grid'); });
   $('#finalizeBtn').disabled = n===0;
 }
 function item(t, ctl, rej){ return `<div class="item ${rej?'rejected':''} ${t.na?'na':''}"><div class="iph"><img src="${t.img}" alt="" loading="lazy">${t.na?NAX():''}</div><div><div class="n">${newPill(t)}<span class="numtag">${t.num}</span> ${esc(t.name)}</div><div class="m">${esc(meta(t))}</div></div><div class="ctl">${ctl}</div></div>`; }
 $('#finalizeBtn').onclick=()=>{
-  const n=selected().length, short=scenes.filter(s=>countFor(s.id)<s.count);
+  const n=slots(), short=scenes.filter(s=>countFor(s.id)<s.count);
   const warn = n<totalNeeded ? `<p>You have ${n} of ${totalNeeded} needed${short.length?` (short on ${short.map(s=>esc(s.name)).join(', ')})`:''}. Send anyway?</p>` : n>totalNeeded ? `<p>You have ${n}, which is ${n-totalNeeded} over the ${totalNeeded} needed. That's fine if you want backups.</p>` : `<p>${n} of ${totalNeeded}. Everything lines up.</p>`;
   modal(`<h2>Finalize selects?</h2>${warn}<button class="big" id="mYes">Yes, finalize</button><button class="big alt" id="mNo">Not yet</button>`);
   $('#mYes').onclick=()=>{ closeModal(); state.finalized=true; save(); show('final'); };
@@ -852,13 +871,13 @@ function finalText(){
   if(CONFIG.shootDates) lines.push(`Shoot days: ${CONFIG.shootDates}`);
   if(CONFIG.location) lines.push(`Location: ${CONFIG.location}`);
   lines.push(`Selected by: ${user.name}${user.role?' ('+user.role+')':''} <${user.email}>`);
-  lines.push(`Total: ${selected().length} of ${totalNeeded} needed`, '');
+  lines.push(`Total: ${slots()} of ${totalNeeded} needed${slots()!==selected().length?` (${selected().length} people, some on more than one scene)`:''}`, '');
   const fresh=selected().filter(isNewPick);
-  if(fresh.length){ lines.push(`NEW SINCE LAST SEND (${fresh.length}): ` + fresh.sort((a,b)=>a.num-b.num).map(t=>`#${t.num} ${t.name} (${sceneName(state.picks[t.id].s)})`).join(', '), ''); }
+  if(fresh.length){ lines.push(`NEW SINCE LAST SEND (${fresh.length}): ` + fresh.sort((a,b)=>a.num-b.num).map(t=>`#${t.num} ${t.name} (${sceneNames(state.picks[t.id])})`).join(', '), ''); }
   for(const s of scenes){
-    const list=selected().filter(t=>S().picks[t.id].s===s.id).sort(byName);
+    const list=selected().filter(t=>inSc(t,s.id)).sort(byName);
     lines.push(`${s.name.toUpperCase()} (${list.length}/${s.count})`);
-    list.forEach(t=>lines.push(`#${t.num} ${t.name}${t.age?' — '+t.age:''}${t.size?', '+t.size:''}${tagNew(t)}`));
+    list.forEach(t=>{ const sc=scOf(S().picks[t.id]); const also=sc.length>1?` [also ${sc.filter(x=>x!==s.id).map(sceneName).join(', ')}]`:''; lines.push(`#${t.num} ${t.name}${t.age?' — '+t.age:''}${t.size?', '+t.size:''}${also}${tagNew(t)}`); });
     lines.push('');
   }
   const rej=rejected().sort(byName);
@@ -898,12 +917,12 @@ function renderFinal(){
 }
 $('#toggleList').onclick=()=>{ listOpen=!listOpen; renderFinal(); };
 function mailto(txt){ return `mailto:${encodeURIComponent(CONFIG.coordinatorEmail)}?subject=${encodeURIComponent('BG Selects – '+CONFIG.jobName+' – '+user.name)}&body=${encodeURIComponent(txt)}`; }
-function markSent(){ const ids=[]; for(const k in state.picks){ const p=state.picks[k]; if(p&&p.s){ p.sent=true; ids.push(k); } } state.sentIds=ids; dirty=true; }
+function markSent(){ const ids=[]; for(const k in state.picks){ const p=state.picks[k]; if(p&&p.s){ p.sent=true; p.sentSc=scOf(p); ids.push(k); } } state.sentIds=ids; dirty=true; }
 // What changed since the last send: new picks (incl. scene moves) and people dropped from the list.
 function changesSinceSend(){
   if(!state.sentAt) return {added:0, removed:0, total:0};
   const added=selected().filter(isNewPick).length;
-  const removed=(state.sentIds||[]).filter(k=>{ const p=state.picks[k]; return !(p&&p.s&&p.sent); }).length;
+  const removed=(state.sentIds||[]).filter(k=>{ const p=state.picks[k]; if(!(p&&p.s&&p.sent)) return true; return (p.sentSc||[p.s]).some(x=>!scOf(p).includes(x)); }).length;
   return {added, removed, total:added+removed};
 }
 async function send(){
@@ -912,8 +931,8 @@ async function send(){
   try{
     if(SHEET){
       const copyMe = state.copyMe!==false;
-      const sceneLists = scenes.map(s=>({name:s.name, count:s.count, people:selected().filter(t=>state.picks[t.id].s===s.id).sort(byName).map(t=>({num:t.num,name:t.name+tagNew(t),age:t.age,size:t.size,img:t.img}))}));
-      const j=await api({action:'send', jobKey:CONFIG.jobKey, jobName:CONFIG.jobName, client:CONFIG.client, shootDates:CONFIG.shootDates, location:CONFIG.location, user, picks:state.picks, finalized:true, summary:summaryText(), coordinatorEmail:CONFIG.coordinatorEmail, coordinatorName:CONFIG.coordinatorName, text:txt, sendCopy:copyMe, sceneLists, total:`${selected().length} of ${totalNeeded} BG`});
+      const sceneLists = scenes.map(s=>({name:s.name, count:s.count, people:selected().filter(t=>inSc(t,s.id)).sort(byName).map(t=>({num:t.num,name:t.name+tagNew(t),age:t.age,size:t.size,img:t.img}))}));
+      const j=await api({action:'send', jobKey:CONFIG.jobKey, jobName:CONFIG.jobName, client:CONFIG.client, shootDates:CONFIG.shootDates, location:CONFIG.location, user, picks:state.picks, finalized:true, summary:summaryText(), coordinatorEmail:CONFIG.coordinatorEmail, coordinatorName:CONFIG.coordinatorName, text:txt, sendCopy:copyMe, sceneLists, total:`${slots()} of ${totalNeeded} BG`});
       if(!j.ok) throw new Error(j.message||'sheet error');
       markSent(); state.sentAt=j.sentAt||new Date().toISOString(); state.copySent=copyMe; dirty=false; save(); toast('Sent.'); sending=false; renderFinal(); return;
     }
@@ -921,7 +940,7 @@ async function send(){
       access_key:CONFIG.web3formsKey,
       subject:`BG Selects – ${CONFIG.jobName} – ${user.name}`,
       from_name:user.name, email:user.email, replyto:user.email,
-      job:CONFIG.jobName, selected_by:user.name, role:user.role||'', total:`${selected().length} of ${totalNeeded}`,
+      job:CONFIG.jobName, selected_by:user.name, role:user.role||'', total:`${slots()} of ${totalNeeded}`,
       message:txt, botcheck:''
     })});
     const j=await res.json().catch(()=>({}));
